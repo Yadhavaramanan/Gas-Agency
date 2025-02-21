@@ -127,15 +127,13 @@
             updateDoc,
         } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
-        const firebaseConfig = {
-            apiKey: "AIzaSyBN2xRWthAE-CitQWDYbyqTl0BuRY7x1uc",
-            authDomain: "gas-agencies.firebaseapp.com",
-            projectId: "gas-agencies",
-            storageBucket: "gas-agencies.appspot.com",
-            messagingSenderId: "90384712021",
-            appId: "1:90384712021:web:6ef4da53f6a5ce9937afdc",
-            measurementId: "G-82EPYR6EQH",
-        };
+        apiKey: "YOUR_API_KEY",
+        authDomain: "YOUR_AUTH_DOMAIN",
+        projectId: "YOUR_PROJECT_ID",
+        storageBucket: "YOUR_STORAGE_BUCKET",
+        messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+        appId: "YOUR_APP_ID"
+        measurementId: "your-measurement-id"};
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
