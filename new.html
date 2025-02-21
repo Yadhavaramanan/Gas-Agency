@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gas Agency Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script type="module" src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js"></script>
+  <script type="module" src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js"></script>
+</head>
+
+<body class="bg-gray-100 min-h-screen flex">
+  <!-- Sidebar -->
+  <aside class="bg-white w-64 p-4 border-r">
+    <h2 class="text-xl font-bold mb-4">Filters</h2>
+    <form id="filterForm" class="space-y-4">
+      <input id="filterClientName" type="text" class="border p-2 rounded w-full" placeholder="Client Name">
+      <select id="filterType" class="border p-2 rounded w-full">
+        <option value="">All Types</option>
+        <option value="Credit">Credit</option>
+        <option value="Debit">Debit</option>
+      </select>
+      <input id="filterStartDate" type="date" class="border p-2 rounded w-full">
+      <input id="filterEndDate" type="date" class="border p-2 rounded w-full">
+      <button type="button" id="applyFilters" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 w-full">
+        Apply Filters
+      </button>
+      <button type="button" id="clearFilters" class="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600 w-full">
+        Clear Filters
+      </button>
+    </form>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="flex-1 p-4">
+    <h1 class="text-2xl font-bold mb-4 text-center">Gas Agency Dashboard</h1>
+
+    <!-- Add/Edit Entry Form -->
+    <div class="bg-white p-4 rounded shadow-md mb-6">
+      <form id="entryForm" class="space-y-4">
+        <div class="grid grid-cols-2 gap-4">
+          <input id="date" type="date" class="border p-2 rounded w-full" required>
+          <input id="clientName" type="text" class="border p-2 rounded w-full" placeholder="Client Name" required>
+        </div>
+        <input id="items" type="text" class="border p-2 rounded w-full" placeholder="Items" required>
+        <select id="type" class="border p-2 rounded w-full" required>
+          <option value="" disabled selected>Type (Credit/Debit)</option>
+          <option value="Credit">Credit</option>
+          <option value="Debit">Debit</option>
+        </select>
+        <input id="amount" type="number" class="border p-2 rounded w-full" placeholder="Amount" required>
+        <button type="submit" id="submitButton" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+          Add Entry
+        </button>
+        <button type="button" id="cancelEdit" class="hidden bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600">
+          Cancel Edit
+        </button>
+      </form>
+    </div>
+
+    <!-- Table and Download Button -->
+    <div class="bg-white p-4 rounded shadow-md">
+      <div class="flex justify-end mb-4">
+        <button type="button" id="downloadData" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">
+          Download Data
+        </button>
+      </div>
+      <table class="table-auto w-full text-left border-collapse">
+        <thead>
+          <tr class="bg-gray-200 text-gray-600">
+            <th class="border px-4 py-2">Sno</th>
+            <th class="border px-4 py-2">Date</th>
+            <th class="border px-4 py-2">Client Name</th>
+            <th class="border px-4 py-2">Items</th>
+            <th class="border px-4 py-2">Type</th>
+            <th class="border px-4 py-2">Amount</th>
+            <th class="border px-4 py-2">Balance</th>
+            <th class="border px-4 py-2">Action</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody" class="text-gray-700"></tbody>
+      </table>
+    </div>
+  </main>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
+    import { getFirestore, collection, addDoc, onSnapshot, doc, deleteDoc, updateDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+
+    // Firebase configuration
+    const firebaseConfig = {
+      apiKey: "AIzaSyBN2xRWthAE-CitQWDYbyqTl0BuRY7x1uc",
+      authDomain: "gas-agencies.firebaseapp.com",
+      projectId: "gas-agencies",
+      storageBucket: "gas-agencies.appspot.com",
+      messagingSenderId: "90384712021",
+      appId: "1:90384712021:web:6ef4da53f6a5ce9937afdc",
+      measurementId: "G-82EPYR6EQH",
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const entriesRef = collection(db, "entries");
+
+    let entries = [];
+    let filteredEntries = [];
+    let editMode = false;
+    let editId = null;
+
+    // Real-time Updates
+    onSnapshot(entriesRef, (snapshot) => {
+      entries = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      filteredEntries = [...entries];
+      renderTable(filteredEntries);
+    });
+
+    const renderTable = (data) => {
+      const tableBody = document.getElementById("tableBody");
+      tableBody.innerHTML = "";
+      let balance = 0;
+
+      data.forEach((entry, index) => {
+        balance += entry.type === "Credit" ? entry.amount : -entry.amount;
+
+        tableBody.innerHTML += `
+          <tr>
+            <td class="border px-4 py-2">${index + 1}</td>
+            <td class="border px-4 py-2">${entry.date}</td>
+            <td class="border px-4 py-2">${entry.clientName}</td>
+            <td class="border px-4 py-2">${entry.items}</td>
+            <td class="border px-4 py-2">${entry.type}</td>
+            <td class="border px-4 py-2">${entry.amount}</td>
+            <td class="border px-4 py-2">${balance.toFixed(2)}</td>
+            <td class="border px-4 py-2">
+              <button onclick="editEntry('${entry.id}')" class="text-blue-500 hover:underline mr-2">Edit</button>
+              <button onclick="deleteEntry('${entry.id}')" class="text-red-500 hover:underline">Delete</button>
+            </td>
+          </tr>`;
+      });
+    };
+
+    // Add/Edit Entry
+    document.getElementById("entryForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const entry = {
+        date: document.getElementById("date").value,
+        clientName: document.getElementById("clientName").value,
+        items: document.getElementById("items").value,
+        type: document.getElementById("type").value,
+        amount: parseFloat(document.getElementById("amount").value),
+      };
+
+      if (editMode) {
+        await updateDoc(doc(db, "entries", editId), entry);
+        editMode = false;
+        editId = null;
+        document.getElementById("cancelEdit").classList.add("hidden");
+      } else {
+        await addDoc(entriesRef, entry);
+      }
+
+      document.getElementById("entryForm").reset();
+    });
+
+    // Delete Entry with Confirmation
+    window.deleteEntry = async (id) => {
+      const confirmDelete = confirm("Are you sure you want to delete this entry?");
+      if (!confirmDelete) {
+        return; // Exit if the user cancels the action
+      }
+
+      try {
+        await deleteDoc(doc(db, "entries", id));
+        alert("Entry deleted successfully!");
+      } catch (error) {
+        console.error("Error deleting document: ", error);
+        alert("An error occurred while deleting the entry.");
+      }
+    };
+
+    // Edit Entry
+    window.editEntry = (id) => {
+      editMode = true;
+      editId = id;
+
+      const entry = entries.find((e) => e.id === id);
+      document.getElementById("date").value = entry.date;
+      document.getElementById("clientName").value = entry.clientName;
+      document.getElementById("items").value = entry.items;
+      document.getElementById("type").value = entry.type;
+      document.getElementById("amount").value = entry.amount;
+      document.getElementById("submitButton").textContent = "Update Entry";
+      document.getElementById("cancelEdit").classList.remove("hidden");
+    };
+
+    // Cancel Edit
+    document.getElementById("cancelEdit").addEventListener("click", () => {
+      editMode = false;
+      editId = null;
+      document.getElementById("entryForm").reset();
+      document.getElementById("cancelEdit").classList.add("hidden");
+    });
+
+    // Apply Filters
+    document.getElementById("applyFilters").addEventListener("click", () => {
+      const clientName = document.getElementById("filterClientName").value.toLowerCase();
+      const type = document.getElementById("filterType").value;
+      const startDate = document.getElementById("filterStartDate").value;
+      const endDate = document.getElementById("filterEndDate").value;
+
+      filteredEntries = entries.filter((entry) => {
+        return (
+          (!clientName || entry.clientName.toLowerCase().includes(clientName)) &&
+          (!type || entry.type === type) &&
+          (!startDate || entry.date >= startDate) &&
+          (!endDate || entry.date <= endDate)
+        );
+      });
+
+      renderTable(filteredEntries);
+    });
+
+    // Clear Filters
+    document.getElementById("clearFilters").addEventListener("click", () => {
+      document.getElementById("filterForm").reset();
+      filteredEntries = [...entries];
+      renderTable(filteredEntries);
+    });
+
+    // Download Data
+    document.getElementById("downloadData").addEventListener("click", () => {
+      let balance = 0;
+      const csvContent = "data:text/csv;charset=utf-8," +
+        ["Sno,Date,Client Name,Items,Type,Amount,Balance"].join(",") + "\n" +
+        filteredEntries.map((entry, index) => {
+          balance += entry.type === "Credit" ? entry.amount : -entry.amount;
+          return [
+            index + 1,
+            entry.date,
+            entry.clientName,
+            entry.items,
+            entry.type,
+            entry.amount,
+            balance.toFixed(2),
+          ].join(",");
+        }).join("\n");
+
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", "filtered_data.csv");
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    });
+  </script>
+</body>
+
+</html>
